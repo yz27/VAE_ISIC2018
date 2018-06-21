@@ -110,7 +110,7 @@ def symlink_without_replace(src_file, tar_dir):
     os.symlink(src_file, pathjoin(tar_dir, file_name))
 
 # create all *_outlier folders
-for abnormal_cls in classes[:3]:
+for abnormal_cls in classes:
     exp_name = '{}_outlier'.format(abnormal_cls)
     exp_folder = pathjoin(TAR_DIR, exp_name)
     vae_train_folder = pathjoin(exp_folder, 'vae_train')
@@ -161,5 +161,5 @@ for abnormal_cls in classes[:3]:
     logging.info('filling in %s', vae_train_train_normal_folder)
     for img_path in tqdm(img_train_paths):
         if get_class(img_path, classes) != abnormal_cls:
-            symlink_without_replace(src_file=img_path, tar_dir=vae_train_val_normal_folder)
+            symlink_without_replace(src_file=img_path, tar_dir=vae_train_train_normal_folder)
 

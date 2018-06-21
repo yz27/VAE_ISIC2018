@@ -1,7 +1,7 @@
 import os
 import torch
 import argparse
-import VAELoss
+from VAELoss import VAELoss
 from utilities import trainVAE, validateVAE, load_opt
 from model import VAE
 from dataloader import load_datasets
@@ -21,7 +21,7 @@ parser.add_argument('--epochs', default=100, type=int, metavar='N',
 # for optimization
 parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,
                     metavar='LR', help='initial learning rate')
-parser.add_argument('--base_lr', default=1e-2, type=float)
+parser.add_argument('--base_lr', default=1e-4, type=float)
 parser.add_argument('--fine_tune', action='store_true',
                     help='if fine tune then use base_lr for the CNN tower.')
 parser.add_argument('-b', '--batch_size', default=4, type=int,
@@ -57,8 +57,9 @@ model = VAE(args.image_size)
 train_loader, val_loader = load_datasets(args.image_size, args)
 
 # load criterion
-criterion = VAELoss()
+criterion = VAELoss(size_average=True)
 if args.cuda is True:
+    model = model.cuda()
     criterion = criterion.cuda()
 
 
@@ -82,14 +83,14 @@ with open(os.path.join(args.out_dir, 'config.txt'), 'w') as f:
         f.write("{}:{}\n".format(k, args_dict[k]))
 writer = SummaryWriter(log_dir=os.path.join(args.out_dir, 'logs'))
 
-# Set initial best loss
-best_loss = 30000
-
 
 def main():
     """
     Main Loop
     """
+    # Set initial best loss
+    best_loss = 30000
+
     for epoch in range(args.epochs):
         # train for one epoch
         scheduler.step()
@@ -98,13 +99,12 @@ def main():
 
         # evaluate on validation set
         with torch.no_grad():
-            val_loss = validateVAE(val_loader, model, criterion, args)
+            val_loss = validateVAE(val_loader, model, criterion, writer, args)
 
         # remember best acc and save checkpoint
         if val_loss < best_loss:
             best_loss = val_loss
             save_dict = {'epoch' : epoch + 1,
-                         'arch' : args.arch,
                          'state_dict' : model.state_dict(),
                          'val_loss' : val_loss,
                          'optimizer' : opt.state_dict()}

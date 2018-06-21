@@ -1,4 +1,5 @@
 import time
+import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -77,7 +78,7 @@ def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
         writer.add_scalar('kl_loss', kl_loss_avg.avg)
 
 
-def validateVAE(val_loader, model, criterion, args):
+def validateVAE(val_loader, model, criterion, writer, args):
     """
     iterate through the validate set and output the accuracy
     """
@@ -117,6 +118,7 @@ def validateVAE(val_loader, model, criterion, args):
                   'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                    i, len(val_loader), batch_time=batch_time, recon_loss=recon_loss_avg,
                    kl_loss= kl_loss_avg, loss=loss_avg))
+        writer.add_scalar('val_loss', loss_avg.avg)
     return loss_avg.avg
 
 
