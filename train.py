@@ -50,7 +50,9 @@ if args.cuda is True:
     criterion = criterion.cuda()
 
 # load data
-train_loader, val_loader = load_vae_train_datasets(args.image_size, args)
+train_loader, val_loader = load_vae_train_datasets(input_size=args.image_size,
+                                                   data=args.data,
+                                                   batch_size=args.batch_size)
 
 # load optimizer and scheduler
 opt = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999))
@@ -74,7 +76,7 @@ best_loss = np.inf
 for epoch in range(args.epochs):
     # train for one epoch
     scheduler.step()
-    train_loss, train_kl, train_reconst_logp = trainVAE(train_loader, model, criterion, opt, epoch, args)
+    train_loss, train_kl, train_reconst_logp = trainVAE(val_loader, model, criterion, opt, epoch, args)
     writer.add_scalar('train_elbo', -train_loss, global_step=epoch + 1)
     writer.add_scalar('train_kl', train_kl, global_step=epoch + 1)
     writer.add_scalar('train_reconst_logp', train_reconst_logp, global_step=epoch + 1)
@@ -88,6 +90,7 @@ for epoch in range(args.epochs):
 
     # remember best acc and save checkpoint
     if val_loss < best_loss:
+        print('checkpointed!')
         best_loss = val_loss
         save_dict = {'epoch': epoch + 1,
                      'state_dict': model.state_dict(),
@@ -95,6 +98,7 @@ for epoch in range(args.epochs):
                      'optimizer': opt.state_dict()}
         save_path = os.path.join(args.out_dir, 'best_model.pth.tar')
         torch.save(save_dict, save_path)
+    print('curr lowest val loss {}'.format(best_loss))
 
     # visualize reconst and free sample
     print("plotting imgs...")
@@ -127,3 +131,5 @@ for epoch in range(args.epochs):
         write_image("origin", imgs)
         write_image("reconst", imgs_reconst)
         write_image("samples", samples)
+        print('done')
+exit()

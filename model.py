@@ -54,12 +54,11 @@ class VAE(nn.Module):
         return [self.conv_mu(output), self.conv_logvar(output)]
 
     def reparameterize(self, mu, logvar):
-        if self.train():
-            std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(std)
-            return eps.mul(std).add_(mu)
-        else:
+        if not self.training:
             return mu
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return eps.mul(std).add_(mu)
 
     def decode(self, z):
         return self.decoder(z)
