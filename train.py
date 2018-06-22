@@ -57,7 +57,7 @@ model = VAE(args.image_size)
 train_loader, val_loader = load_datasets(args.image_size, args)
 
 # load criterion
-criterion = VAELoss(size_average=True)
+criterion = VAELoss(size_average=False)
 if args.cuda is True:
     model = model.cuda()
     criterion = criterion.cuda()

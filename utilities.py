@@ -3,6 +3,7 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
