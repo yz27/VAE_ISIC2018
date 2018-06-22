@@ -76,7 +76,7 @@ best_loss = np.inf
 for epoch in range(args.epochs):
     # train for one epoch
     scheduler.step()
-    train_loss, train_kl, train_reconst_logp = trainVAE(val_loader, model, criterion, opt, epoch, args)
+    train_loss, train_kl, train_reconst_logp = trainVAE(train_loader, model, criterion, opt, epoch, args)
     writer.add_scalar('train_elbo', -train_loss, global_step=epoch + 1)
     writer.add_scalar('train_kl', train_kl, global_step=epoch + 1)
     writer.add_scalar('train_reconst_logp', train_reconst_logp, global_step=epoch + 1)
