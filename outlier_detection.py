@@ -1,13 +1,13 @@
 """
-The script for running a quick iter on vae_test
+The script for doing outlier detection using different score
 """
 import argparse
 from model import VAE
 from loss import VAELoss
-from dataloader import load_vae_train_datasets, load_vae_test_datasets
+from dataloader import load_vae_test_datasets
 import os
 import torch
-from utilities import evaluateVAE, validateVAE
+from utilities import evaluateVAE
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', required=True, type=str)
@@ -37,18 +37,28 @@ if args.cuda:
     criterion = criterion.cuda()
 
 # load data
-_, val_loader = load_vae_train_datasets(args.image_size, args.data, args.batch_size)
 test_loader = load_vae_test_datasets(args.image_size, args.data)
 
 with torch.no_grad():
-    val_loss, _, _ = validateVAE(val_loader=val_loader,
-                                 model=model,
-                                 criterion=criterion,
-                                 args=args)
     avg_normal_loss, avg_abnormal_loss = evaluateVAE(test_loader=test_loader,
                                                      model=model,
                                                      criterion=criterion,
                                                      args=args)
-print("test avg loss normal {}\ttest avg loss abnormal {}\tval avg loss normal {}".format(
-    avg_normal_loss, avg_abnormal_loss, val_loss))
+print("test avg loss normal {}\ttest avg loss abnormal {}".format(avg_normal_loss, avg_abnormal_loss))
+
+
+# define different way of computing score
+def reconstruct_score(vae, image, L=5):
+    """
+    The reconstruct score for a single image
+    :param image: [1, 3, 256, 256]
+    """
+    # Do a parallel run by repeat image for L times
+    # [L, 3, 256, 256]
+    image_batch = image.expand(L,
+                               image.size(1),
+                               image.size(2),
+                               image.size(3))
+    reconst, mu, logvar = vae.forward(image_batch)
+
 
