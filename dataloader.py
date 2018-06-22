@@ -19,7 +19,7 @@ def load_vae_test_datasets(input_size, data):
 
     test_dataset = datasets.ImageFolder(testdir, transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1,
-                                               shuffle=True, num_workers=8,
+                                               shuffle=True, num_workers=4,
                                                pin_memory=True)
     return test_loader
 
@@ -42,9 +42,9 @@ def load_vae_train_datasets(input_size, data, batch_size):
     val_dataset = datasets.ImageFolder(valdir, transform)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
-                                               shuffle=True, num_workers=8,
+                                               shuffle=True, num_workers=4,
                                                pin_memory=True)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size,
-                                             shuffle=True, num_workers=8,
+                                             shuffle=True, num_workers=4,
                                              pin_memory=True)
     return train_loader, val_loader

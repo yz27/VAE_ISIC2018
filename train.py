@@ -25,7 +25,7 @@ parser.add_argument('-b', '--batch_size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 64)')
 parser.add_argument('--lr_decay', default=0.1, type=float,
                     help='learning rate decay')
-parser.add_argument('--schedule', type=int, nargs='+', default=[40, 60, 80],
+parser.add_argument('--schedule', type=int, nargs='+', default=[50, 75,],
                     help='Decrease learning rate at these epochs.')
 
 # for checkpoint loading
@@ -132,4 +132,5 @@ for epoch in range(args.epochs):
         write_image("reconst", imgs_reconst)
         write_image("samples", samples)
         print('done')
-exit()
+
+import ipdb
