@@ -12,10 +12,10 @@ class AverageMeter(object):
         self.sum = 0
         self.count = 0
 
-    def update(self, val, n=1):
+    def update(self, val):
         self.val = val
-        self.sum += val * n
-        self.count += n
+        self.sum += val
+        self.count += 1
         self.avg = self.sum / self.count
 
 
@@ -44,9 +44,9 @@ def trainVAE(train_loader, model, criterion, optimizer, epoch, args):
         loss, loss_details = criterion(recon_batch, input, mu, logvar)
 
         # record loss
-        loss_avg.update(loss.item(), input.size(0))
-        kl_avg.update(loss_details['KL'].item(), input.size(0))
-        reconst_logp_avg.update(loss_details['reconst_logp'].item(), input.size(0))
+        loss_avg.update(loss.item())
+        kl_avg.update(loss_details['KL'].item())
+        reconst_logp_avg.update(loss_details['reconst_logp'].item())
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -93,9 +93,9 @@ def validateVAE(val_loader, model, criterion, args):
         loss, loss_details = criterion(recon_batch, input, mu, logvar)
 
         # measure accuracy and record loss
-        loss_avg.update(loss.item(), input.size(0))
-        kl_avg.update(loss_details['KL'].item(), input.size(0))
-        reconst_logp_avg.update(loss_details['reconst_logp'].item(), input.size(0))
+        loss_avg.update(loss.item())
+        kl_avg.update(loss_details['KL'].item())
+        reconst_logp_avg.update(loss_details['reconst_logp'].item())
 
         # measure elapsed time
         batch_time.update(time.time() - end)
