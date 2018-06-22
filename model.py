@@ -9,7 +9,7 @@ nc = 3
 class VAE(nn.Module):
     def __init__(self, imageSize):
         super(VAE, self).__init__()
-
+        self.nz = nz
         n = math.log2(imageSize)
 
         assert n == round(n), 'imageSize must be a power of 2'

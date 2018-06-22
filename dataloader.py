@@ -2,34 +2,44 @@ import os
 import torch
 from torchvision import transforms, datasets
 
-
-def load_datasets(input_size, args):
+def load_vae_test_datasets(input_size, args):
     """
-    load the dataloader according to args and input size.
+    load the datasets from vae_test folder
     """
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
+    testdir = os.path.join(args.data, 'vae_test')
 
-    # precomputed stats
     normalize = transforms.Normalize(
         mean=[0.5, 0.5, 0.5],
         std=[0.5, 0.5, 0.5])
-    train_transform = transforms.Compose([
-        #transforms.RandomResizedCrop(224), # disable for now
-        #transforms.RandomHorizontalFlip(), #transforms.RandomVerticalFlip(),
-        #transforms.RandomRotation(180),
-        transforms.Resize((input_size, input_size)),
-        transforms.ToTensor(),
-        normalize,
-    ])
-    val_transform = transforms.Compose([
+    transform = transforms.Compose([
         transforms.Resize((input_size, input_size)),
         transforms.ToTensor(),
         normalize,
     ])
 
-    train_dataset = datasets.ImageFolder(traindir, train_transform)
-    val_dataset = datasets.ImageFolder(valdir, val_transform)
+    test_dataset = datasets.ImageFolder(testdir, transform)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size,
+                                               shuffle=True, num_workers=8,
+                                               pin_memory=True)
+
+def load_vae_train_datasets(input_size, args):
+    """
+    load the datasets from vae_train folders
+    """
+    traindir = os.path.join(args.data, 'vae_train/train')
+    valdir = os.path.join(args.data, 'vae_train/val')
+
+    normalize = transforms.Normalize(
+        mean=[0.5, 0.5, 0.5],
+        std=[0.5, 0.5, 0.5])
+    transform = transforms.Compose([
+        transforms.Resize((input_size, input_size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_dataset = datasets.ImageFolder(traindir, transform)
+    val_dataset = datasets.ImageFolder(valdir, transform)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
                                                shuffle=True, num_workers=8,

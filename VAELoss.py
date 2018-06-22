@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class VAELoss(nn.Module):
     """
             This criterion is an implementation of VAELoss
@@ -13,10 +12,13 @@ class VAELoss(nn.Module):
 
     def forward(self, recon_x, x, mu, logvar):
         """
-        recon_x: generating images
-        x: origin images
-        mu: latent mean
-        logvar: latent log variance
+        :param recon_x: generating images. [bsz, C, H, W]
+        :param x: origin images. [bsz, C, H, W]
+        :param mu: latent mean. [bsz, z_dim]
+        :param logvar: latent log variance. [bsz, z_dim]
+        :return loss, loss_details.
+            loss: a scalar. negative of elbo
+            loss_details: {'KL': KL, 'reconst_logp': -reconst_err}
         """
         bsz = x.shape[0]
         reconst_err = (x - recon_x).pow(2).reshape(bsz, -1)
@@ -25,15 +27,12 @@ class VAELoss(nn.Module):
         # KL(q || p) = -log_sigma + sigma^2/2 + mu^2/2 - 1/2
         KL = (-logvar + logvar.exp() + mu.pow(2) - 1) * 0.5
         KL = torch.sum(KL, dim=-1)
-        # loss = reconst_err + KL
 
         if self.size_average:
-            reconst_err = torch.mean(reconst_err)
             KL = torch.mean(KL)
-            # loss = torch.mean(loss)
+            reconst_err = torch.mean(reconst_err)
         else:
-            reconst_err = torch.sum(reconst_err)
             KL = torch.sum(KL)
-            # loss = torch.sum(loss)
-
-        return reconst_err, KL
+            reconst_err = torch.sum(reconst_err)
+        loss = reconst_err + KL
+        return loss, {'KL': KL, 'reconst_logp': -reconst_err}
