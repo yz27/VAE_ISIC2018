@@ -21,12 +21,12 @@
 
     The output folder has following structure:
     tar_dir
-    ├── class1_outlier
-    ├── class2_outlier
-    └── class3_outlier
+    ├── class1
+    ├── class2
+    └── class3
 
     where each one of them is:
-    classN_outlier
+    classN
     ├── vae_test
     │   ├── abnormal (10% of images of class N)
     │   └── normal (10% of images without class N)
@@ -111,7 +111,7 @@ def symlink_without_replace(src_file, tar_dir):
 
 # create all *_outlier folders
 for abnormal_cls in classes:
-    exp_name = '{}_outlier'.format(abnormal_cls)
+    exp_name = '{}'.format(abnormal_cls)
     exp_folder = pathjoin(TAR_DIR, exp_name)
     vae_train_folder = pathjoin(exp_folder, 'vae_train')
     vae_test_folder = pathjoin(exp_folder, 'vae_test')
