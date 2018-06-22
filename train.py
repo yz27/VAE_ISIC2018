@@ -1,7 +1,7 @@
 import os
 import torch
 import argparse
-from VAELoss import VAELoss
+from loss import VAELoss
 from torchvision.utils import make_grid
 from utilities import trainVAE, validateVAE
 from model import VAE

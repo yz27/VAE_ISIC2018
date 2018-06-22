@@ -1,6 +1,9 @@
+"""
+The script for running a quick iter on vae_test
+"""
 import argparse
 from model import VAE
-from VAELoss import VAELoss
+from loss import VAELoss
 from dataloader import load_vae_train_datasets, load_vae_test_datasets
 import os
 import torch
@@ -38,14 +41,14 @@ _, val_loader = load_vae_train_datasets(args.image_size, args.data, args.batch_s
 test_loader = load_vae_test_datasets(args.image_size, args.data)
 
 with torch.no_grad():
-    avg_normal_loss, avg_abnormal_loss = evaluateVAE(test_loader=test_loader,
-                                                     model=model,
-                                                     criterion=criterion,
-                                                     args=args)
     val_loss, _, _ = validateVAE(val_loader=val_loader,
                                  model=model,
                                  criterion=criterion,
                                  args=args)
+    avg_normal_loss, avg_abnormal_loss = evaluateVAE(test_loader=test_loader,
+                                                     model=model,
+                                                     criterion=criterion,
+                                                     args=args)
 print("test avg loss normal {}\ttest avg loss abnormal {}\tval avg loss normal {}".format(
     avg_normal_loss, avg_abnormal_loss, val_loss))
 
