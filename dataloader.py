@@ -37,7 +37,6 @@ def load_vae_train_datasets(input_size, args):
         transforms.ToTensor(),
         normalize,
     ])
-
     train_dataset = datasets.ImageFolder(traindir, transform)
     val_dataset = datasets.ImageFolder(valdir, transform)
 

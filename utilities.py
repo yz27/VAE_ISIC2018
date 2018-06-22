@@ -19,7 +19,7 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
+def trainVAE(train_loader, model, criterion, optimizer, epoch, args):
     """
     Iterate through the train data and perform optimization
     """
@@ -68,10 +68,10 @@ def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
                    data_time=data_time, reconst_logp_avg=reconst_logp_avg, kl_avg=kl_avg,
                    loss=loss_avg))
 
-        return loss_avg.avg, kl_avg.avg, reconst_logp_avg.avg
+    return loss_avg.avg, kl_avg.avg, reconst_logp_avg.avg
 
 
-def validateVAE(val_loader, model, criterion, writer, args):
+def validateVAE(val_loader, model, criterion, args):
     """
     iterate through the validate set and output the accuracy
     """

@@ -39,23 +39,18 @@ parser.add_argument('--print_freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--out_dir', default='./result', type=str,
                     help='output result for tensorboard and model checkpoint')
-
+parser.add_argument('--cuda', action='store_true')
 args = parser.parse_args()
-if torch.cuda.is_available():
-    args.cuda = True
-else:
-    args.cuda = False
-
-model = VAE(args.image_size)
-
-# load data
-train_loader, val_loader = load_vae_train_datasets(args.image_size, args)
 
 # load criterion
-criterion = VAELoss(size_average=False)
+model = VAE(args.image_size)
+criterion = VAELoss(size_average=True)
 if args.cuda is True:
     model = model.cuda()
     criterion = criterion.cuda()
+
+# load data
+train_loader, val_loader = load_vae_train_datasets(args.image_size, args)
 
 # load optimizer and scheduler
 opt = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999))
@@ -95,7 +90,6 @@ for epoch in range(args.epochs):
     if val_loss < best_loss:
         best_loss = val_loss
         save_dict = {'epoch': epoch + 1,
-                     'arch': args.arch,
                      'state_dict': model.state_dict(),
                      'val_loss': val_loss,
                      'optimizer': opt.state_dict()}
@@ -114,7 +108,7 @@ for epoch in range(args.epochs):
         imgs_reconst, mu, logvar = model(imgs)
 
         # sample 25 imgs
-        noises = torch.randn(25, model.z_dim, 1, 1)
+        noises = torch.randn(25, model.nz, 1, 1)
         if args.cuda:
             noises = noises.cuda()
         samples = model.decode(noises)
