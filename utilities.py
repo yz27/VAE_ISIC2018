@@ -1,7 +1,5 @@
 import time
-import torch
-from torch.optim import Adam
-from torch.optim.lr_scheduler import MultiStepLR
+from tqdm import tqdm
 
 
 class AverageMeter(object):
@@ -17,21 +15,20 @@ class AverageMeter(object):
 
     def update(self, val, n=1):
         self.val = val
-        self.sum += val * n
+        self.sum += val*n
         self.count += n
         self.avg = self.sum / self.count
 
 
-def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
+def trainVAE(train_loader, model, criterion, optimizer, epoch, args):
     """
     Iterate through the train data and perform optimization
     """
     batch_time = AverageMeter()
     data_time = AverageMeter()
     loss_avg = AverageMeter()
-    recon_loss_avg = AverageMeter()
-    kl_loss_avg = AverageMeter()
-
+    kl_avg = AverageMeter()
+    reconst_logp_avg = AverageMeter()
 
     # switch to train mode
     model.train()
@@ -45,13 +42,12 @@ def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
             input = input.cuda()
 
         recon_batch, mu, logvar = model(input)
-        recon_loss, kl_loss = criterion(recon_batch, input, mu, logvar)
-        loss = recon_loss + kl_loss
+        loss, loss_details = criterion(recon_batch, input, mu, logvar)
 
         # record loss
-        recon_loss_avg.update(recon_loss.item(), input.size(0))
-        kl_loss_avg.update(kl_loss.item(), input.size(0))
         loss_avg.update(loss.item(), input.size(0))
+        kl_avg.update(loss_details['KL'].item(), input.size(0))
+        reconst_logp_avg.update(loss_details['reconst_logp'].item(), input.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -66,46 +62,41 @@ def trainVAE(train_loader, model, criterion, optimizer, epoch, writer, args):
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'recon_loss {recon_loss.val:.4f} ({recon_loss.avg:.4f})\t'
-                  'kl_loss {kl_loss.val:.4f} ({kl_loss.avg:.4f})\t'
+                  'reconst_logp {reconst_logp_avg.val:.4f} ({reconst_logp_avg.avg:.4f})\t'
+                  'kl {kl_avg.val:.4f} ({kl_avg.avg:.4f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                    epoch, i, len(train_loader), batch_time=batch_time,
-                   data_time=data_time, recon_loss=recon_loss_avg, kl_loss=kl_loss_avg,
+                   data_time=data_time, reconst_logp_avg=reconst_logp_avg, kl_avg=kl_avg,
                    loss=loss_avg))
 
-        # tensorboard logging
-        writer.add_scalar('train_loss', loss_avg.avg)
-        writer.add_scalar('recon_loss', recon_loss_avg.avg)
-        writer.add_scalar('kl_loss', kl_loss_avg.avg)
+    return loss_avg.avg, kl_avg.avg, reconst_logp_avg.avg
 
 
-def validateVAE(val_loader, model, criterion, writer, args):
+def validateVAE(val_loader, model, criterion, args):
     """
     iterate through the validate set and output the accuracy
     """
     batch_time = AverageMeter()
     loss_avg = AverageMeter()
-    recon_loss_avg = AverageMeter()
-    kl_loss_avg = AverageMeter()
+    kl_avg = AverageMeter()
+    reconst_logp_avg = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
 
     end = time.time()
-    for i, (input, target) in enumerate(val_loader):
+    for i, (input, _) in enumerate(val_loader):
         if args.cuda:
-            target = target.cuda()
             input = input.cuda()
 
         # compute output
         recon_batch, mu, logvar = model(input)
-        recon_loss, kl_loss = criterion(recon_batch, input, mu, logvar)
-        loss = recon_loss + kl_loss
+        loss, loss_details = criterion(recon_batch, input, mu, logvar)
 
         # measure accuracy and record loss
-        recon_loss_avg.update(recon_loss.item(), input.size(0))
-        kl_loss_avg.update(kl_loss.item(), input.size(0))
         loss_avg.update(loss.item(), input.size(0))
+        kl_avg.update(loss_details['KL'].item(), input.size(0))
+        reconst_logp_avg.update(loss_details['reconst_logp'].item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -114,36 +105,38 @@ def validateVAE(val_loader, model, criterion, writer, args):
         if i % args.print_freq == 0:
             print('Test: [{0}/{1}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'recon_loss {recon_loss.val:.4f} ({recon_loss.avg:.4f})\t'
-                  'kl_loss {kl_loss.val:.4f} ({kl_loss.avg:.4f})\t'
+                  'reconst_logp {reconst_logp_avg.val:.4f} ({reconst_logp_avg.avg:.4f})\t'
+                  'kl {kl_avg.val:.4f} ({kl_avg.avg:.4f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
-                   i, len(val_loader), batch_time=batch_time, recon_loss=recon_loss_avg,
-                   kl_loss= kl_loss_avg, loss=loss_avg))
-        writer.add_scalar('val_loss', loss_avg.avg)
-    return loss_avg.avg
+                   i, len(val_loader), batch_time=batch_time, reconst_logp_avg=reconst_logp_avg,
+                   kl_avg=kl_avg, loss=loss_avg))
+    return loss_avg.avg, kl_avg.avg, reconst_logp_avg.avg
 
-
-def load_opt(args, base_params, top_params):
+def evaluateVAE(test_loader, model, criterion, args):
     """
-    Load the optimizer and lr scheduler. If resume and not reset opt,
-    load from checkpoint. Only use adam now with default betas.
-    :param base_params: a list of CNN base parameters
-    :param top_params: a list of fc parameters
-    :return: opt, scheduler
+    iterate through test loader and find out average loss of normal and
+    abnormal
     """
-    if args.fine_tune:
-        opt_specs = [
-            {'params' : base_params, 'lr' : args.base_lr},
-            {'params' : top_params, 'lr' : args.lr},
-        ]
-    else:
-        all_params = base_params + top_params
-        opt_specs = [{'params' : all_params, 'lr' : args.lr}]
-    opt = Adam(opt_specs, weight_decay=args.l2_decay, betas=(0.9, 0.999))
-    scheduler = MultiStepLR(opt, milestones=args.schedule, gamma=args.lr_decay)
+    avg_abnormal_loss = AverageMeter()
+    avg_normal_loss = AverageMeter()
 
-    # load from checkpoint only if we don't reset optimizer
-    if args.resume is not None and args.reset_opt is False:
-        checkpoint = torch.load(args.resume)
-        opt.load_state_dict(checkpoint['optimizer'])
-    return opt, scheduler
+    # switch to evaluate mode
+    model.eval()
+
+    for i, (input, target) in tqdm(enumerate(test_loader)):
+       if args.cuda:
+           input = input.cuda()
+
+       # compute output
+       recon_batch, mu, logvar = model(input)
+       loss, loss_details = criterion(recon_batch, input, mu, logvar)
+
+       # if normal
+       if target.item() == 1:
+           avg_normal_loss.update(loss.item(), input.size(0))
+       else:
+           avg_abnormal_loss.update(loss.item(), input.size(0))
+
+    return avg_normal_loss.avg, avg_abnormal_loss.avg
+
+

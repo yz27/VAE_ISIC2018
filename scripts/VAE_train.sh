@@ -1,14 +1,19 @@
 #!/bin/bash
-# please run this scripts in the train/ directory
 
 # set this to your python binary
-# PYTHONBIN='/home/luyuchen.paul/.conda/envs/pytorch/bin/python'
-PYTHONBIN='/home/peng/anaconda3/bin/python'
-
-# stdout log
-LOGNAME="exp_$(date +"%Y%m%d%H").log"
-echo "result is in $LOGNAME"
+export PYTHONBIN='/home/luyuchen.paul/.conda/envs/pytorch/bin/python'
 export PYTHONUNBUFFERED=1
 
-$PYTHONBIN train.py --data /home/peng/ISIC2018_outlier/AKIEC_outlier/vae_train \
-    --epochs 45 --lr 1e-4 --batch_size 32 --out_dir AKIEC_result > $LOGNAME &
+# set exp root dir and dataset root dir
+export DATA_DIR='/home/luyuchen.paul/ISIC2018_outlier'
+export EXP_DIR='/home/luyuchen.paul/exp_results'
+
+declare -a outliers=("AKIEC" "BCC" "BKL" "DF" "MEL" "NV" "VASC")
+
+# loop through outlier classes
+for outlier in "${outliers[@]}"
+do
+    echo "#################TRAIN ${outlier} ##################"
+    $PYTHONBIN train.py --data ${DATA_DIR}/${outlier} --cuda \
+        --epochs 80 --lr 1e-4 --batch_size 32 --out_dir ${EXP_DIR}/${outlier}
+done

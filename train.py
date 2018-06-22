@@ -1,15 +1,15 @@
 import os
 import torch
 import argparse
-from VAELoss import VAELoss
-from utilities import trainVAE, validateVAE, load_opt
+from loss import VAELoss
+from torchvision.utils import make_grid
+from utilities import trainVAE, validateVAE
 from model import VAE
-from dataloader import load_datasets
+from dataloader import load_vae_train_datasets
 from tensorboardX import SummaryWriter
+import numpy as np
 
-# import ipdb
-
-parser = argparse.ArgumentParser(description='skin disease classification')
+parser = argparse.ArgumentParser(description='VAE for outlier in skin image')
 parser.add_argument('--data', metavar='DIR', help='path to dataset', type=str)
 
 # for models
@@ -21,16 +21,11 @@ parser.add_argument('--epochs', default=100, type=int, metavar='N',
 # for optimization
 parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,
                     metavar='LR', help='initial learning rate')
-parser.add_argument('--base_lr', default=1e-4, type=float)
-parser.add_argument('--fine_tune', action='store_true',
-                    help='if fine tune then use base_lr for the CNN tower.')
-parser.add_argument('-b', '--batch_size', default=4, type=int,
+parser.add_argument('-b', '--batch_size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 64)')
-parser.add_argument('--l2_decay', default=1e-4, type=float,
-                    help="l2 weight decay")
 parser.add_argument('--lr_decay', default=0.1, type=float,
                     help='learning rate decay')
-parser.add_argument('--schedule', type=int, nargs='+', default=[45, ],
+parser.add_argument('--schedule', type=int, nargs='+', default=[45,],
                     help='Decrease learning rate at these epochs.')
 
 # for checkpoint loading
@@ -44,32 +39,25 @@ parser.add_argument('--print_freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--out_dir', default='./result', type=str,
                     help='output result for tensorboard and model checkpoint')
-
+parser.add_argument('--cuda', action='store_true')
 args = parser.parse_args()
-if torch.cuda.is_available():
-    args.cuda = True
-else:
-    args.cuda = False
-
-model = VAE(args.image_size)
-
-# load data
-train_loader, val_loader = load_datasets(args.image_size, args)
 
 # load criterion
-criterion = VAELoss(size_average=False)
+model = VAE(args.image_size)
+criterion = VAELoss(size_average=True)
 if args.cuda is True:
     model = model.cuda()
     criterion = criterion.cuda()
 
+# load data
+train_loader, val_loader = load_vae_train_datasets(input_size=args.image_size,
+                                                   data=args.data,
+                                                   batch_size=args.batch_size)
 
 # load optimizer and scheduler
-top_params = [p for p in model.parameters()]
-base_params = []
-for key, _ in (model._modules.items()):
-    if key != 'decoder':
-        base_params += [p for p in model._modules[key].parameters()]
-opt, scheduler = load_opt(args, base_params, top_params)
+opt = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+scheduler = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=args.schedule,
+                                                 gamma=args.lr_decay)
 
 # make output dir
 if os.path.isdir(args.out_dir):
@@ -83,34 +71,66 @@ with open(os.path.join(args.out_dir, 'config.txt'), 'w') as f:
         f.write("{}:{}\n".format(k, args_dict[k]))
 writer = SummaryWriter(log_dir=os.path.join(args.out_dir, 'logs'))
 
+# main loop
+best_loss = np.inf
+for epoch in range(args.epochs):
+    # train for one epoch
+    scheduler.step()
+    train_loss, train_kl, train_reconst_logp = trainVAE(train_loader, model, criterion, opt, epoch, args)
+    writer.add_scalar('train_elbo', -train_loss, global_step=epoch + 1)
+    writer.add_scalar('train_kl', train_kl, global_step=epoch + 1)
+    writer.add_scalar('train_reconst_logp', train_reconst_logp, global_step=epoch + 1)
 
-def main():
-    """
-    Main Loop
-    """
-    # Set initial best loss
-    best_loss = 30000
+    # evaluate on validation set
+    with torch.no_grad():
+        val_loss, val_kl, val_reconst_logp = validateVAE(val_loader, model, criterion, args)
+        writer.add_scalar('val_elbo', -val_loss, global_step=epoch + 1)
+        writer.add_scalar('val_kl', val_kl, global_step=epoch + 1)
+        writer.add_scalar('val_reconst_logp', val_reconst_logp, global_step=epoch + 1)
 
-    for epoch in range(args.epochs):
-        # train for one epoch
-        scheduler.step()
-        # ipdb.set_trace()
-        trainVAE(train_loader, model, criterion, opt, epoch, writer, args)
+    # remember best acc and save checkpoint
+    if val_loss < best_loss:
+        print('checkpointed!')
+        best_loss = val_loss
+        save_dict = {'epoch': epoch + 1,
+                     'state_dict': model.state_dict(),
+                     'val_loss': val_loss,
+                     'optimizer': opt.state_dict()}
+        save_path = os.path.join(args.out_dir, 'best_model.pth.tar')
+        torch.save(save_dict, save_path)
+    print('curr lowest val loss {}'.format(best_loss))
 
-        # evaluate on validation set
-        with torch.no_grad():
-            val_loss = validateVAE(val_loader, model, criterion, writer, args)
+    # visualize reconst and free sample
+    print("plotting imgs...")
+    with torch.no_grad():
+        val_iter = val_loader.__iter__()
 
-        # remember best acc and save checkpoint
-        if val_loss < best_loss:
-            best_loss = val_loss
-            save_dict = {'epoch' : epoch + 1,
-                         'state_dict' : model.state_dict(),
-                         'val_loss' : val_loss,
-                         'optimizer' : opt.state_dict()}
-            save_path = os.path.join(args.out_dir, 'best_model.pth.tar')
-            torch.save(save_dict, save_path)
+        # reconstruct 25 imgs
+        imgs = val_iter._get_batch()[1][0][:25]
+        if args.cuda:
+            imgs = imgs.cuda()
+        imgs_reconst, mu, logvar = model(imgs)
 
+        # sample 25 imgs
+        noises = torch.randn(25, model.nz, 1, 1)
+        if args.cuda:
+            noises = noises.cuda()
+        samples = model.decode(noises)
 
-if __name__ == '__main__':
-    main()
+        def write_image(tag, images):
+            """
+            write the resulting imgs to tensorboard.
+            :param tag: The tag for tensorboard
+            :param images: the torch tensor with range (-1, 1). [9, 3, 256, 256]
+            """
+            # make it from 0 to 255
+            images = (images + 1) / 2
+            grid = make_grid(images, nrow=5, padding=20)
+            writer.add_image(tag, grid.detach(), global_step=epoch + 1)
+
+        write_image("origin", imgs)
+        write_image("reconst", imgs_reconst)
+        write_image("samples", samples)
+        print('done')
+
+import ipdb
