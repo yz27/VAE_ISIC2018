@@ -25,7 +25,7 @@ parser.add_argument('-b', '--batch_size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 64)')
 parser.add_argument('--lr_decay', default=0.1, type=float,
                     help='learning rate decay')
-parser.add_argument('--schedule', type=int, nargs='+', default=[45,],
+parser.add_argument('--schedule', type=int, nargs='+', default=[100,],
                     help='Decrease learning rate at these epochs.')
 
 # for checkpoint loading
@@ -42,8 +42,18 @@ parser.add_argument('--out_dir', default='./result', type=str,
 parser.add_argument('--cuda', action='store_true')
 args = parser.parse_args()
 
-# load criterion
+# load checkpoint
+if args.resume is not None:
+    checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage)
+    print("checkpoint loaded!")
+    print("val loss: {}\tepoch: {}\t".format(checkpoint['val_loss'], checkpoint['epoch']))
+
+# model
 model = VAE(args.image_size)
+if args.resume is not None:
+    model.load_state_dict(checkpoint['state_dict'])
+
+# criterion
 criterion = VAELoss(size_average=True)
 if args.cuda is True:
     model = model.cuda()
@@ -56,6 +66,9 @@ train_loader, val_loader = load_vae_train_datasets(input_size=args.image_size,
 
 # load optimizer and scheduler
 opt = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+if args.resume is not None and not args.reset_opt:
+    opt.load_state_dict(checkpoint['optimizer'])
+
 scheduler = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=args.schedule,
                                                  gamma=args.lr_decay)
 

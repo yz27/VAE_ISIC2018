@@ -138,6 +138,8 @@ for abnormal_cls in classes:
     os.mkdir(vae_train_val_normal_folder)
 
     # fill in vae_test
+    num_test_normal = 0
+    num_test_abnormal = 0
     logging.info('filling in %s', vae_test_folder)
     for img_path in tqdm(img_test_paths):
         img_file_name = os.path.split(img_path)[1]
@@ -146,20 +148,29 @@ for abnormal_cls in classes:
         # determine target folder in vae_test
         if img_cls == abnormal_cls:
             target_folder = test_abnormal_folder
+            num_test_abnormal += 1
         else:
             target_folder = test_normal_folder
+            num_test_normal += 1
 
         symlink_without_replace(src_file=img_path, tar_dir=target_folder)
 
     # fill in vae_train/val/normal
+    num_val = 0
     logging.info('filling in %s', vae_train_val_normal_folder)
     for img_path in tqdm(img_val_paths):
         if get_class(img_path, classes) != abnormal_cls:
+            num_val += 1
             symlink_without_replace(src_file=img_path, tar_dir=vae_train_val_normal_folder)
 
     # fill in vae_train/train/normal
+    num_train = 0
     logging.info('filling in %s', vae_train_train_normal_folder)
     for img_path in tqdm(img_train_paths):
         if get_class(img_path, classes) != abnormal_cls:
+            num_train += 1
             symlink_without_replace(src_file=img_path, tar_dir=vae_train_train_normal_folder)
+
+    print("train :{}\tval: {}\ttest_normal: {}\ttest_abnormal: {}".format(
+        num_train, num_val, num_test_normal, num_test_abnormal))
 
