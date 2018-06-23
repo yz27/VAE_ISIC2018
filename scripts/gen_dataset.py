@@ -50,6 +50,8 @@ logging.getLogger().setLevel(logging.INFO)
 parser = argparse.ArgumentParser()
 parser.add_argument('--src_dir', required=True, type=str)
 parser.add_argument('--tar_dir', required=True, type=str)
+parser.add_argument('--normal', action='store_true',
+                    help='if this flag is set to be true, reverse normal and abnormal')
 args = parser.parse_args()
 SRC_DIR = args.src_dir
 TAR_DIR = args.tar_dir
@@ -110,8 +112,8 @@ def symlink_without_replace(src_file, tar_dir):
     os.symlink(src_file, pathjoin(tar_dir, file_name))
 
 # create all *_outlier folders
-for abnormal_cls in classes:
-    exp_name = '{}'.format(abnormal_cls)
+for cls in classes:
+    exp_name = '{}'.format(cls)
     exp_folder = pathjoin(TAR_DIR, exp_name)
     vae_train_folder = pathjoin(exp_folder, 'vae_train')
     vae_test_folder = pathjoin(exp_folder, 'vae_test')
@@ -137,6 +139,13 @@ for abnormal_cls in classes:
     os.mkdir(vae_train_train_normal_folder)
     os.mkdir(vae_train_val_normal_folder)
 
+
+    def is_normal_class(curr_cls):
+        if args.normal:
+            return curr_cls == cls
+        else:
+            return curr_cls != cls
+
     # fill in vae_test
     num_test_normal = 0
     num_test_abnormal = 0
@@ -146,12 +155,12 @@ for abnormal_cls in classes:
         img_cls = get_class(img_path, classes)
 
         # determine target folder in vae_test
-        if img_cls == abnormal_cls:
-            target_folder = test_abnormal_folder
-            num_test_abnormal += 1
-        else:
+        if is_normal_class(img_cls):
             target_folder = test_normal_folder
             num_test_normal += 1
+        else:
+            target_folder = test_abnormal_folder
+            num_test_abnormal += 1
 
         symlink_without_replace(src_file=img_path, tar_dir=target_folder)
 
@@ -159,7 +168,7 @@ for abnormal_cls in classes:
     num_val = 0
     logging.info('filling in %s', vae_train_val_normal_folder)
     for img_path in tqdm(img_val_paths):
-        if get_class(img_path, classes) != abnormal_cls:
+        if is_normal_class(get_class(img_path, classes)):
             num_val += 1
             symlink_without_replace(src_file=img_path, tar_dir=vae_train_val_normal_folder)
 
@@ -167,7 +176,7 @@ for abnormal_cls in classes:
     num_train = 0
     logging.info('filling in %s', vae_train_train_normal_folder)
     for img_path in tqdm(img_train_paths):
-        if get_class(img_path, classes) != abnormal_cls:
+        if is_normal_class(get_class(img_path, classes)):
             num_train += 1
             symlink_without_replace(src_file=img_path, tar_dir=vae_train_train_normal_folder)
 
