@@ -27,7 +27,6 @@ class VAELoss(nn.Module):
         # KL(q || p) = -log_sigma + sigma^2/2 + mu^2/2 - 1/2
         KL = (-logvar + logvar.exp() + mu.pow(2) - 1) * 0.5
         KL = torch.sum(KL, dim=-1)
-
         if self.size_average:
             KL = torch.mean(KL)
             reconst_err = torch.mean(reconst_err)
@@ -36,3 +35,24 @@ class VAELoss(nn.Module):
             reconst_err = torch.sum(reconst_err)
         loss = reconst_err + KL
         return loss, {'KL': KL, 'reconst_logp': -reconst_err}
+
+    def forward_without_reduce(self, recon_x, x, mu, logvar):
+        """
+        This also compute the vae loss but it's without take mean or take sum
+        :param recon_x: generating images. [bsz, C, H, W]
+        :param x: origin images. [bsz, C, H, W]
+        :param mu: latent mean. [bsz, z_dim]
+        :param logvar: latent log variance. [bsz, z_dim]
+        :return: losses. [bsz]
+        """
+        bsz = x.shape[0]
+        reconst_err = (x - recon_x).pow(2).reshape(bsz, -1)
+        reconst_err = 0.5 * torch.sum(reconst_err, dim=-1)
+
+        # KL(q || p) = -log_sigma + sigma^2/2 + mu^2/2 - 1/2
+        KL = (-logvar + logvar.exp() + mu.pow(2) - 1) * 0.5
+        KL = torch.sum(KL, dim=-1)
+
+        # [bsz]
+        losses = reconst_err + KL
+        return losses

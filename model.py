@@ -49,10 +49,19 @@ class VAE(nn.Module):
         self.decoder.add_module('output-tanh', nn.Tanh())
 
     def encode(self, input):
+        """
+        :param input: [bsz, 3, 256, 256]
+        :return: mu [bsz, z_dim, 1, 1]. logvar [bsz, z_dim, 1, 1]
+        """
         output = self.encoder(input)
         return [self.conv_mu(output), self.conv_logvar(output)]
 
     def reparameterize(self, mu, logvar):
+        """
+        :param mu: can be any shape
+        :param logvar: can be any shappe
+        :return: same shape as mu
+        """
         if not self.training:
             return mu
         std = torch.exp(0.5 * logvar)
@@ -60,9 +69,20 @@ class VAE(nn.Module):
         return eps.mul(std).add_(mu)
 
     def decode(self, z):
+        """
+        :param z: [bsz, z_dim, 1, 1]
+        :return reconst_x: [bsz, 3, 256, 256]
+        """
         return self.decoder(z)
 
     def forward(self, x):
+        """
+        :param x: [bsz, 3, 256, 256]
+        :return: reconst_x: [bsz, 3, 256, 256]
+                 mu, logvar: [bsz, z_dim]
+        """
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
+        return self.decode(z), \
+               mu.squeeze(-1).squeeze(-1), \
+               logvar.squeeze(-1).squeeze(-1)
