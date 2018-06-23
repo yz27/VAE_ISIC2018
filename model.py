@@ -62,8 +62,6 @@ class VAE(nn.Module):
         :param logvar: can be any shappe
         :return: same shape as mu
         """
-        if not self.training:
-            return mu
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return eps.mul(std).add_(mu)
