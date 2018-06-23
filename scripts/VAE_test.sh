@@ -14,7 +14,7 @@ declare -a outliers=("AKIEC")
 for outlier in "${outliers[@]}"
 do
     echo "#################TEST ${outlier} ##################"
-    $PYTHONBIN outlier_detection.py \
+    $PYTHONBIN outlier_detection.py --cuda \
         --data ${DATA_DIR}/${outlier} \
         --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar
 done
