@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 
 ngf = 64
-nz = 100
+nz = 200
 nc = 3
 class VAE(nn.Module):
     def __init__(self, imageSize):
@@ -20,33 +20,47 @@ class VAE(nn.Module):
 
         self.encoder = nn.Sequential()
         # input is (nc) x 64 x 64
-        self.encoder.add_module('input-conv', nn.Conv2d(nc, ngf, 4, 2, 1, bias=False))
-        self.encoder.add_module('input-relu', nn.LeakyReLU(0.2, inplace=True))
+        self.encoder.add_module('input-conv', nn.Conv2d(nc, ngf, 4, 2, 1,
+                                                        bias=True))
+        self.encoder.add_module('input-relu', nn.ReLU(inplace=True))
         for i in range(n - 3):
             # state size. (ngf) x 32 x 32
             self.encoder.add_module('pyramid_{0}-{1}_conv'.format(ngf * 2 ** i, ngf * 2 ** (i + 1)),
-                                    nn.Conv2d(ngf * 2 ** (i), ngf * 2 ** (i + 1), 4, 2, 1, bias=False))
+                                    nn.Conv2d(ngf * 2 ** (i), ngf * 2 ** (i + 1), 4, 2, 1, bias=True))
             self.encoder.add_module('pyramid_{0}_batchnorm'.format(ngf * 2 ** (i + 1)),
                                     nn.BatchNorm2d(ngf * 2 ** (i + 1)))
-            self.encoder.add_module('pyramid_{0}_relu'.format(ngf * 2 ** (i + 1)), nn.LeakyReLU(0.2, inplace=True))
+            self.encoder.add_module('pyramid_{0}_relu'.format(ngf * 2 ** (i + 1)), nn.ReLU(inplace=True))
 
         self.decoder = nn.Sequential()
         # input is Z, going into a convolution
-        self.decoder.add_module('input-conv', nn.ConvTranspose2d(nz, ngf * 2 ** (n - 3), 4, 1, 0, bias=False))
+        self.decoder.add_module('input-conv', nn.ConvTranspose2d(nz, ngf * 2 ** (n - 3), 4, 1, 0, bias=True))
         self.decoder.add_module('input-batchnorm', nn.BatchNorm2d(ngf * 2 ** (n - 3)))
-        self.decoder.add_module('input-relu', nn.LeakyReLU(0.2, inplace=True))
+        self.decoder.add_module('input-relu', nn.ReLU(inplace=True))
 
         # state size. (ngf * 2**(n-3)) x 4 x 4
 
         for i in range(n - 3, 0, -1):
             self.decoder.add_module('pyramid_{0}-{1}_conv'.format(ngf * 2 ** i, ngf * 2 ** (i - 1)),
-                                    nn.ConvTranspose2d(ngf * 2 ** i, ngf * 2 ** (i - 1), 4, 2, 1, bias=False))
+                                    nn.ConvTranspose2d(
+                                        ngf * 2 ** i, ngf * 2 ** (i - 1),
+                                        4, 2, 1, bias=True))
             self.decoder.add_module('pyramid_{0}_batchnorm'.format(ngf * 2 ** (i - 1)),
                                     nn.BatchNorm2d(ngf * 2 ** (i - 1)))
-            self.decoder.add_module('pyramid_{0}_relu'.format(ngf * 2 ** (i - 1)), nn.LeakyReLU(0.2, inplace=True))
+            self.decoder.add_module('pyramid_{0}_relu'.format(ngf * 2 ** (i - 1)), nn.ReLU(inplace=True))
 
-        self.decoder.add_module('ouput-conv', nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False))
+        self.decoder.add_module('ouput-conv', nn.ConvTranspose2d(ngf, nc, 4, 2,
+                                                                 1, bias=True))
         self.decoder.add_module('output-tanh', nn.Tanh())
+
+        # weight init
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
 
     def encode(self, input):
         """
@@ -54,6 +68,7 @@ class VAE(nn.Module):
         :return: mu [bsz, z_dim, 1, 1]. logvar [bsz, z_dim, 1, 1]
         """
         output = self.encoder(input)
+        output = output.squeeze(-1).squeeze(-1)
         return [self.conv_mu(output), self.conv_logvar(output)]
 
     def reparameterize(self, mu, logvar):

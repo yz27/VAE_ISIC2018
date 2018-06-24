@@ -16,9 +16,11 @@ do
     echo "#################TEST ${outlier} ##################"
     $PYTHONBIN outlier_detection.py --cuda \
         --data ${DATA_DIR}/${outlier} \
-        --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar
+        --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar \
+        --image_size 128
 
     $PYTHONBIN outlier_detection_gaus.py --cuda \
         --data ${DATA_DIR}/${outlier} \
-        --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar
+        --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar \
+        --image_size 128
 done

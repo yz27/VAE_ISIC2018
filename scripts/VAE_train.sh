@@ -15,5 +15,6 @@ for outlier in "${outliers[@]}"
 do
     echo "#################TRAIN ${outlier} ##################"
     $PYTHONBIN train.py --data ${DATA_DIR}/${outlier} --cuda \
-        --epochs 60 --lr 1e-4 --batch_size 32 --out_dir ${EXP_DIR}/${outlier}
+        --epochs 40 --lr 1e-4 --batch_size 32 --out_dir ${EXP_DIR}/${outlier} \
+        --image_size 128
 done
