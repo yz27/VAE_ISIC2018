@@ -90,7 +90,7 @@ random.shuffle(nv_paths)
 split = int(0.95 * len(nv_paths))
 nv_train_paths = nv_paths[:split]
 nv_val_paths = nv_paths[split:]
-logging.info('num. train images: %d\tnum. val images: %d'.format(
+logging.info('num. train images: {}\tnum. val images: {}'.format(
              len(nv_train_paths), len(nv_val_paths)))
 
 def symlink_without_replace(src_file, tar_dir):
@@ -131,11 +131,11 @@ os.mkdir(vae_train_train_normal_folder)
 os.mkdir(vae_train_val_normal_folder)
 
 # fill in vae_train/train folder
-for img in nv_train_paths:
+for img in tqdm(nv_train_paths):
     symlink_without_replace(src_file=img, tar_dir=vae_train_train_normal_folder)
 
 # fill in vae_train/val
-for img in nv_val_paths:
+for img in tqdm(nv_val_paths):
     symlink_without_replace(src_file=img, tar_dir=vae_train_val_normal_folder)
 
 # fill in vae_test/NV

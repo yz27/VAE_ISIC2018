@@ -3,7 +3,7 @@ import torch.nn as nn
 import math
 
 ngf = 64
-nz = 200
+nz = 300
 nc = 3
 class VAE(nn.Module):
     def __init__(self, imageSize):

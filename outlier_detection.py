@@ -9,6 +9,9 @@ import os
 import torch
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
+from itertools import product
+import numpy as np
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', required=True, type=str)
@@ -127,35 +130,33 @@ def compute_all_scores(vae, image):
 
 # MAIN LOOP
 score_names = ['reconst_score', 'vae_score', 'iwae_score']
-
-trus = []
-scores = {name: [] for name in score_names}
+classes = test_loader.dataset.classes
+scores = {(score_name, cls): [] for (score_name, cls) in product(score_names,
+                                                                 classes)}
 model.eval()
 with torch.no_grad():
     for idx, (image, target) in tqdm(enumerate(test_loader)):
-        # if target is abnormal
-        if target.item() == 0:
-            trus.append(1)
-        else:
-            trus.append(0)
-
+        cls = classes[target.item()]
         if args.cuda:
             image = image.cuda()
 
         score = compute_all_scores(vae=model, image=image)
         for name in score_names:
-            scores[name].append(score[name])
+            scores[(name, cls)].append(score[name])
 
-# get auc roc
-auc_result = dict()
-for name in score_names:
-    auc_result[name] = roc_auc_score(y_true=trus,
-                                     y_score=scores[name])
-
+# get auc roc remove. remove the NV class
+classes.remove('NV')
+auc_result = np.zeros([len(score_names), len(classes)])
+for (name, cls) in product(score_names, classes):
+    normal_scores = scores[(name, 'NV')]
+    abnormal_scores = scores[(name, cls)]
+    y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
+    y_score = normal_scores + abnormal_scores
+    auc_result[score_names.index(name), classes.index(cls)] = roc_auc_score(y_true, y_score)
+df = pd.DataFrame(auc_result, index=score_names, columns=classes)
 # display
 print("###################### AUC ROC #####################")
-for name in score_names:
-    print("{} roc auc: {}".format(name, auc_result[name]))
+print(df)
 print("####################################################")
 
 

@@ -9,6 +9,8 @@ import os
 import torch
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
+import numpy as np
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', required=True, type=str)
@@ -67,16 +69,12 @@ print("estimated done!")
 
 # get through all test data
 test_loader = load_vae_test_datasets(args.image_size, args.data)
-trus = []
-z_scores = []
+classes = test_loader.dataset.classes
+z_scores = {cls: [] for cls in classes}
 model.eval()
 with torch.no_grad():
     for idx, (img, target) in tqdm(enumerate(test_loader)):
-        # if target is abnormal
-        if target.item() == 0:
-            trus.append(1)
-        else:
-            trus.append(0)
+        cls = classes[target.item()]
 
         if args.cuda:
             img = img.cuda()
@@ -85,10 +83,19 @@ with torch.no_grad():
         loss, _ = criterion(recons, img, mu, logvar)
 
         z_score = (loss.item() - sample_mean)**2 / sample_var
-        z_scores.append(z_score)
+        z_scores[cls].append(z_score)
 
-
+# get auc roc remove. remove the NV class
+classes.remove('NV')
+auc_result = np.zeros([1, len(classes)])
+for cls in classes:
+    normal_scores = z_scores['NV']
+    abnormal_scores = z_scores[cls]
+    y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
+    y_score = normal_scores + abnormal_scores
+    auc_result[0, classes.index(cls)] = roc_auc_score(y_true, y_score)
+df = pd.DataFrame(auc_result, index=['z_score'], columns=classes)
 # display
 print("###################### AUC ROC #####################")
-print("z_score roc auc: {}".format(roc_auc_score(y_true=trus, y_score=z_scores)))
+print(df)
 print("####################################################")

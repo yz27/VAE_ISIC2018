@@ -25,7 +25,7 @@ parser.add_argument('-b', '--batch_size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 64)')
 parser.add_argument('--lr_decay', default=0.1, type=float,
                     help='learning rate decay')
-parser.add_argument('--schedule', type=int, nargs='+', default=[30],
+parser.add_argument('--schedule', type=int, nargs='+', default=[50],
                     help='Decrease learning rate at these epochs.')
 
 # for checkpoint loading
