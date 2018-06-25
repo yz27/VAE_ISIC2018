@@ -18,6 +18,9 @@ parser.add_argument('--model_path', required=True, type=str)
 parser.add_argument('--data', required=True, type=str)
 parser.add_argument('--image_size', default=256, type=int)
 parser.add_argument('--cuda', action='store_true')
+parser.add_argument('--kl_weight', type=float, default=1,
+                    help="weight on KL term")
+
 args = parser.parse_args()
 
 # load checkpoint
@@ -31,7 +34,7 @@ print("val loss: {}\tepoch: {}\t".format(checkpoint['val_loss'], checkpoint['epo
 # model and criterion
 model = VAE(args.image_size)
 model.load_state_dict(checkpoint['state_dict'])
-criterion = VAELoss(size_average=True)
+criterion = VAELoss(size_average=True, kl_weight=args.kl_weight)
 
 if args.cuda:
     model = model.cuda()
@@ -145,29 +148,27 @@ df_mean = pd.DataFrame(means, index=score_names, columns=classes)
 print("###################### MEANS #####################")
 print(df_mean)
 
-# get auc roc remove. remove the NV class
+
 classes.remove('NV')
-auc_result = np.zeros([len(score_names), len(classes)])
+auc_result = np.zeros([len(score_names), len(classes) + 1])
+# get auc roc for each class
 for (name, cls) in product(score_names, classes):
     normal_scores = scores[(name, 'NV')]
     abnormal_scores = scores[(name, cls)]
     y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
     y_score = normal_scores + abnormal_scores
     auc_result[score_names.index(name), classes.index(cls)] = roc_auc_score(y_true, y_score)
-df = pd.DataFrame(auc_result, index=score_names, columns=classes)
+
+# add auc roc against all diseases
+for name in score_names:
+    normal_scores = scores[(name, 'NV')]
+    abnormal_scores = np.concatenate([scores[(name, cls)]for cls in classes]).tolist()
+    y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
+    y_score = normal_scores + abnormal_scores
+    auc_result[score_names.index(name), -1] = roc_auc_score(y_true, y_score)
+
+df = pd.DataFrame(auc_result, index=score_names, columns=classes + ['ALL'])
 # display
 print("###################### AUC ROC #####################")
 print(df)
 print("####################################################")
-
-
-
-
-
-
-
-
-
-
-
-
