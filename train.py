@@ -27,6 +27,8 @@ parser.add_argument('--lr_decay', default=0.1, type=float,
                     help='learning rate decay')
 parser.add_argument('--schedule', type=int, nargs='+', default=[50],
                     help='Decrease learning rate at these epochs.')
+parser.add_argument('--kl_weight', type=float, default=1,
+                    help="weight on KL term")
 
 # for checkpoint loading
 parser.add_argument('--resume', default=None, type=str, metavar='PATH',

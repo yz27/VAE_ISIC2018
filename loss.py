@@ -6,9 +6,10 @@ class VAELoss(nn.Module):
             This criterion is an implementation of VAELoss
     """
 
-    def __init__(self, size_average=False):
+    def __init__(self, size_average=False, kl_weight=1):
         super(VAELoss, self).__init__()
         self.size_average = size_average
+        self.kl_weight = kl_weight
 
     def forward(self, recon_x, x, mu, logvar):
         """
@@ -33,7 +34,7 @@ class VAELoss(nn.Module):
         else:
             KL = torch.sum(KL)
             reconst_err = torch.sum(reconst_err)
-        loss = reconst_err + KL
+        loss = reconst_err + self.kl_weight * KL
         return loss, {'KL': KL, 'reconst_logp': -reconst_err}
 
     def forward_without_reduce(self, recon_x, x, mu, logvar):
