@@ -41,36 +41,19 @@ if args.cuda:
 test_loader = load_vae_test_datasets(args.image_size, args.data)
 
 ############################# ANOMALY SCORE DEF ##########################
-def get_reconst_score(vae, image, L=5):
-    """
-    The reconstruct score for a single image
-    :param image: [1, 3, 256, 256]
-    :return scocre: the reconstruct score
-    """
-    # Do a parallel run by repeat image for L times
-    # [L, 3, 256, 256]
-    image_batch = image.expand(L,
-                               image.size(1),
-                               image.size(2),
-                               image.size(3))
-    reconst_batch, _, _ = vae.forward(image_batch)
-    scores = torch.sum(0.5 * (reconst_batch - image_batch).pow(2),
-                              dim=-1)
-    return torch.mean(scores)
-
 def get_vae_score(vae, image, L=5):
     """
     The vae score for a single image, which is basically the loss
     :param image: [1, 3, 256, 256]
-    :return scocre: the reconstruct score
+    :return (vae loss, KL, reconst_err)
     """
     image_batch = image.expand(L,
                                image.size(1),
                                image.size(2),
                                image.size(3))
     reconst_batch, mu, logvar = vae.forward(image_batch)
-    vae_loss, _ = criterion(reconst_batch, image_batch, mu, logvar)
-    return vae_loss
+    vae_loss, loss_details = criterion(reconst_batch, image_batch, mu, logvar)
+    return vae_loss, loss_details['KL'], -loss_details['reconst_logp']
 
 def _log_mean_exp(x, dim):
     """
@@ -103,7 +86,7 @@ def get_iwae_score(vae, image, L=5, K=5):
     reconst_batch, mu, logvar = vae.forward(image_batch)
 
     # [L*K]
-    vae_losses = criterion.forward_without_reduce(reconst_batch,
+    vae_losses, _ = criterion.forward_without_reduce(reconst_batch,
                                                   image_batch,
                                                   mu,
                                                   logvar)
@@ -122,14 +105,16 @@ def compute_all_scores(vae, image):
     Given an image compute all anomaly score
     return (reconst_score, vae_score, iwae_score)
     """
-    result = {'reconst_score': get_reconst_score(vae=vae, image=image, L=4).item(),
-              'vae_score': get_vae_score(vae=vae, image=image, L=4).item(),
-              'iwae_score': get_iwae_score(vae=vae, image=image, L=2, K=2).item(),}
+    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=5)
+    result = {'reconst_score': reconst_err.item(),
+              'KL_score': KL.item(),
+              'vae_score': vae_loss.item(),
+              'iwae_score': get_iwae_score(vae=vae, image=image, L=1, K=5).item(),}
     return result
 
 
 # MAIN LOOP
-score_names = ['reconst_score', 'vae_score', 'iwae_score']
+score_names = ['reconst_score', 'KL_score', 'vae_score', 'iwae_score']
 classes = test_loader.dataset.classes
 scores = {(score_name, cls): [] for (score_name, cls) in product(score_names,
                                                                  classes)}

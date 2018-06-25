@@ -56,10 +56,10 @@ with torch.no_grad():
         recons, mu, logvar = model.forward(imgs)
 
         # [bsz]
-        losses = criterion.forward_without_reduce(recons,
-                                                  imgs,
-                                                  mu,
-                                                  logvar)
+        losses, _ = criterion.forward_without_reduce(recons,
+                                                     imgs,
+                                                     mu,
+                                                     logvar)
         loss_avg += torch.sum(losses).item() / total_num
         loss_sq_avg += torch.sum(losses.pow(2)).item() / total_num
 

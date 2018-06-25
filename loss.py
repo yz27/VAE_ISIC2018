@@ -43,7 +43,7 @@ class VAELoss(nn.Module):
         :param x: origin images. [bsz, C, H, W]
         :param mu: latent mean. [bsz, z_dim]
         :param logvar: latent log variance. [bsz, z_dim]
-        :return: losses. [bsz]
+        :return: losses. [bsz] and loss details
         """
         bsz = x.shape[0]
         reconst_err = (x - recon_x).pow(2).reshape(bsz, -1)
@@ -55,4 +55,4 @@ class VAELoss(nn.Module):
 
         # [bsz]
         losses = reconst_err + KL
-        return losses
+        return losses, {'KL': KL, 'reconst_logp': -reconst_err}
