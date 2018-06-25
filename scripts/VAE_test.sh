@@ -14,12 +14,7 @@ declare -a outliers=("NV")
 for outlier in "${outliers[@]}"
 do
     echo "#################TEST ${outlier} ##################"
-    #$PYTHONBIN outlier_detection.py --cuda \
-    #    --data ${DATA_DIR} \
-    #    --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar \
-    #    --image_size 128
-
-    $PYTHONBIN outlier_detection_gaus.py --cuda \
+    $PYTHONBIN outlier_detection.py --cuda \
         --data ${DATA_DIR} \
         --model_path ${EXP_DIR}/${outlier}/best_model.pth.tar \
         --image_size 128

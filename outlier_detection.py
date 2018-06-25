@@ -129,6 +129,14 @@ with torch.no_grad():
         for name in score_names:
             scores[(name, cls)].append(score[name])
 
+# display the mean of scores
+means = np.zeros([len(score_names), len(classes)])
+for (name, cls) in product(score_names, classes):
+    means[score_names.index(name), classes.index(cls)] = sum(scores[(name, cls)]) / len(scores[(name, cls)])
+df_mean = pd.DataFrame(means, index=score_names, columns=classes)
+print("###################### MEANS #####################")
+print(df_mean)
+
 # get auc roc remove. remove the NV class
 classes.remove('NV')
 auc_result = np.zeros([len(score_names), len(classes)])
@@ -143,6 +151,9 @@ df = pd.DataFrame(auc_result, index=score_names, columns=classes)
 print("###################### AUC ROC #####################")
 print(df)
 print("####################################################")
+
+
+
 
 
 
