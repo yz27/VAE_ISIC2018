@@ -56,7 +56,7 @@ if args.resume is not None:
     model.load_state_dict(checkpoint['state_dict'])
 
 # criterion
-criterion = VAELoss(size_average=True)
+criterion = VAELoss(size_average=True, kl_weight=args.kl_weight)
 if args.cuda is True:
     model = model.cuda()
     criterion = criterion.cuda()
