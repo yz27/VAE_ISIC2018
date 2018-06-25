@@ -77,7 +77,7 @@ def get_iwae_score(vae, image, L=5, K=5):
     """
     The vae score for a single image, which is basically the loss
     :param image: [1, 3, 256, 256]
-    :return scocre: the reconstruct score
+    :return scocre: (iwae score, iwae KL, iwae reconst).
     """
     image_batch = image.expand(L*K,
                                image.size(1),
@@ -86,16 +86,20 @@ def get_iwae_score(vae, image, L=5, K=5):
     reconst_batch, mu, logvar = vae.forward(image_batch)
 
     # [L*K]
-    vae_losses, _ = criterion.forward_without_reduce(reconst_batch,
-                                                  image_batch,
-                                                  mu,
-                                                  logvar)
+    vae_losses, loss_details = criterion.forward_without_reduce(reconst_batch,
+                                                                image_batch,
+                                                                mu,
+                                                                logvar)
     # [L, K]
     vae_losses = vae_losses.reshape(L, K)
+    KL_losses = loss_details['KL'].reshape(L, K)
+    reconst_err = -loss_details['reconst_logp'].reshape(L, K)
 
     # [L]
-    scores = _log_mean_exp(vae_losses, dim=1)
-    return torch.mean(scores)
+    iwae_scores = _log_mean_exp(vae_losses, dim=1)
+    iwae_KL_scores = _log_mean_exp(KL_losses, dim=1)
+    iwae_reconst_scores = _log_mean_exp(reconst_err, dim=1)
+    return torch.mean(iwae_scores), torch.mean(iwae_KL_scores), torch.mean(iwae_reconst_scores)
 
 ############################# END OF ANOMALY SCORE ###########################
 
@@ -106,15 +110,19 @@ def compute_all_scores(vae, image):
     return (reconst_score, vae_score, iwae_score)
     """
     vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=5)
+    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=1, K=5)
     result = {'reconst_score': reconst_err.item(),
               'KL_score': KL.item(),
               'vae_score': vae_loss.item(),
-              'iwae_score': get_iwae_score(vae=vae, image=image, L=1, K=5).item(),}
+              'iwae_score': iwae_loss.item(),
+              'iwae_KL_score': iwae_KL.item(),
+              'iwae_reconst_score': iwae_reconst.item()}
     return result
 
 
 # MAIN LOOP
-score_names = ['reconst_score', 'KL_score', 'vae_score', 'iwae_score']
+score_names = ['reconst_score', 'KL_score', 'vae_score',
+               'iwae_score', 'iwae_KL_score', 'iwae_reconst_score']
 classes = test_loader.dataset.classes
 scores = {(score_name, cls): [] for (score_name, cls) in product(score_names,
                                                                  classes)}
