@@ -17,5 +17,5 @@ do
     $PYTHONBIN outlier_detection.py --cuda \
         --data ${DATA_DIR} \
         --model_path ${EXP_DIR}/${outlier}_kl0.01/best_model.pth.tar \
-        --image_size 128
+        --image_size 128 --kl_weight 0.01
 done

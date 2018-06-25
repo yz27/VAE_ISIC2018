@@ -55,5 +55,5 @@ class VAELoss(nn.Module):
         KL = torch.sum(KL, dim=-1)
 
         # [bsz]
-        losses = reconst_err + KL
+        losses = reconst_err + self.kl_weight * KL
         return losses, {'KL': KL, 'reconst_logp': -reconst_err}
