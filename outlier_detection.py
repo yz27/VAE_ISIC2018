@@ -77,33 +77,40 @@ def _log_mean_exp(x, dim):
     return m + torch.log(torch.mean(torch.exp(x0),
                                     dim=dim))
 
-def get_iwae_score(vae, image, L=5, K=5):
+def get_iwae_score(vae, image, L=5):
     """
     The vae score for a single image, which is basically the loss
     :param image: [1, 3, 256, 256]
     :return scocre: (iwae score, iwae KL, iwae reconst).
     """
-    image_batch = image.expand(L*K,
+    # [L, 3, 256, 256]
+    image_batch = image.expand(L,
                                image.size(1),
                                image.size(2),
                                image.size(3))
-    reconst_batch, mu, logvar = vae.forward(image_batch)
 
-    # [L*K]
-    vae_losses, loss_details = criterion.forward_without_reduce(reconst_batch,
-                                                                image_batch,
-                                                                mu,
-                                                                logvar)
-    # [L, K]
-    vae_losses = vae_losses.reshape(L, K)
-    KL_losses = loss_details['KL'].reshape(L, K)
-    reconst_err = -loss_details['reconst_logp'].reshape(L, K)
+    # [L, z_dim, 1, 1]
+    mu, logvar = vae.encode(image_batch)
+    eps = torch.randn_like(mu)
+    z = mu + eps * torch.exp(0.5 * logvar)
+    kl_weight = criterion.kl_weight
+    # [L, 3, 256, 256]
+    reconst = vae.decode(z)
+    # [L]
+    log_p_x_z = torch.sum((reconst - image_batch).pow(2).reshape(L, -1),
+                          dim=1)
 
     # [L]
-    iwae_scores = _log_mean_exp(vae_losses, dim=1)
-    iwae_KL_scores = _log_mean_exp(KL_losses, dim=1)
-    iwae_reconst_scores = _log_mean_exp(reconst_err, dim=1)
-    return torch.mean(iwae_scores), torch.mean(iwae_KL_scores), torch.mean(iwae_reconst_scores)
+    log_p_z = -torch.sum(z.pow(2).reshape(L, -1), dim=1)
+
+    # [L]
+    log_q_z = -torch.sum(eps.pow(2).reshape(L, -1), dim=1)
+
+    iwae_score = _log_mean_exp(log_p_x_z + (log_p_z - log_q_z)*kl_weight, dim=0)
+    iwae_KL_score = _log_mean_exp(log_p_z - log_q_z, dim=0)
+    iwae_reconst_score = _log_mean_exp(log_p_x_z, dim=0)
+
+    return iwae_score, iwae_KL_score, iwae_reconst_score
 
 ############################# END OF ANOMALY SCORE ###########################
 
@@ -113,8 +120,8 @@ def compute_all_scores(vae, image):
     Given an image compute all anomaly score
     return (reconst_score, vae_score, iwae_score)
     """
-    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=1)
-    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=1, K=1)
+    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=5)
+    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=5)
     result = {'reconst_score': reconst_err.item(),
               'KL_score': KL.item(),
               'vae_score': vae_loss.item(),
@@ -126,7 +133,7 @@ def compute_all_scores(vae, image):
 
 # MAIN LOOP
 score_names = ['reconst_score', 'KL_score', 'vae_score',
-               'iwae_score', 'iwae_KL_score', 'iwae_reconst_score']
+               'iwae_reconst_score', 'iwae_KL_score', 'iwae_score']
 classes = test_loader.dataset.classes
 scores = {(score_name, cls): [] for (score_name, cls) in product(score_names,
                                                                  classes)}
