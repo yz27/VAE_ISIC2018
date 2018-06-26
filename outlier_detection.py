@@ -4,7 +4,7 @@ The script for doing outlier detection using different score
 import argparse
 from model import VAE
 from loss import VAELoss
-from dataloader import load_vae_test_datasets
+from dataloader import load_vae_test_datasets, load_vae_train_datasets
 import os
 import torch
 from tqdm import tqdm
@@ -12,6 +12,7 @@ from sklearn.metrics import roc_auc_score
 from itertools import product
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', required=True, type=str)
@@ -112,8 +113,8 @@ def compute_all_scores(vae, image):
     Given an image compute all anomaly score
     return (reconst_score, vae_score, iwae_score)
     """
-    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=5)
-    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=1, K=5)
+    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=1)
+    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=1, K=1)
     result = {'reconst_score': reconst_err.item(),
               'KL_score': KL.item(),
               'vae_score': vae_loss.item(),
@@ -172,3 +173,53 @@ df = pd.DataFrame(auc_result, index=score_names, columns=classes + ['ALL'])
 print("###################### AUC ROC #####################")
 print(df)
 print("####################################################")
+
+# fit a gamma distribution
+_, val_loader = load_vae_train_datasets(args.image_size, args.data, 32)
+model.eval()
+all_reconst_err = []
+num_val = len(val_loader.dataset)
+with torch.no_grad():
+    for img, _ in tqdm(val_loader):
+        if args.cuda:
+            img = img.cuda()
+
+        # compute output
+        recon_batch, mu, logvar = model(img)
+        loss, loss_details = criterion.forward_without_reduce(recon_batch, img, mu, logvar)
+        reconst_err = -loss_details['reconst_logp']
+        all_reconst_err += reconst_err.tolist()
+
+fit_alpha, fit_loc, fit_beta=stats.gamma.fit(all_reconst_err)
+
+# using gamma for outlier detection
+# get auc roc for each class
+LARGE_NUMBER = 1e30
+
+def get_gamma_score(scores):
+    result = -stats.gamma.logpdf(scores, fit_alpha, fit_loc, fit_beta)
+    # replace inf in result with largest number
+    result[result == np.inf] = LARGE_NUMBER
+    return result
+
+auc_gamma_result = np.zeros([1, len(classes)+1])
+name = 'reconst_score'
+for cls in classes:
+    normal_scores = get_gamma_score(scores[(name, 'NV')]).tolist()
+    abnormal_scores = get_gamma_score(scores[(name, cls)]).tolist()
+    y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
+    y_score = normal_scores + abnormal_scores
+    auc_gamma_result[0, classes.index(cls)] = roc_auc_score(y_true, y_score)
+
+# for all class
+normal_scores = get_gamma_score(scores[(name, 'NV')]).tolist()
+abnormal_scores = np.concatenate([get_gamma_score(scores[(name, cls)]) for cls in classes]).tolist()
+y_true = [0]*len(normal_scores) + [1]*len(abnormal_scores)
+y_score = normal_scores + abnormal_scores
+auc_gamma_result[0, -1] = roc_auc_score(y_true, y_score)
+df = pd.DataFrame(auc_gamma_result, index=['gamma score'], columns=classes + ['ALL'])
+
+# display
+print("###################### AUC ROC #####################")
+print(df)
+print("###################################################")
