@@ -21,7 +21,7 @@ parser.add_argument('--image_size', default=256, type=int)
 parser.add_argument('--cuda', action='store_true')
 parser.add_argument('--kl_weight', type=float, default=1,
                     help="weight on KL term")
-
+parser.add_argument('--out_csv', default='result.csv')
 args = parser.parse_args()
 
 # load checkpoint
@@ -97,7 +97,7 @@ def get_iwae_score(vae, image, L=5):
     # [L, 3, 256, 256]
     reconst = vae.decode(z)
     # [L]
-    log_p_x_z = torch.sum((reconst - image_batch).pow(2).reshape(L, -1),
+    log_p_x_z = -torch.sum((reconst - image_batch).pow(2).reshape(L, -1),
                           dim=1)
 
     # [L]
@@ -106,9 +106,9 @@ def get_iwae_score(vae, image, L=5):
     # [L]
     log_q_z = -torch.sum(eps.pow(2).reshape(L, -1), dim=1)
 
-    iwae_score = _log_mean_exp(log_p_x_z + (log_p_z - log_q_z)*kl_weight, dim=0)
-    iwae_KL_score = _log_mean_exp(log_p_z - log_q_z, dim=0)
-    iwae_reconst_score = _log_mean_exp(log_p_x_z, dim=0)
+    iwae_score = -_log_mean_exp(log_p_x_z + (log_p_z - log_q_z)*kl_weight, dim=0)
+    iwae_KL_score = -_log_mean_exp(log_p_z - log_q_z, dim=0)
+    iwae_reconst_score = -_log_mean_exp(log_p_x_z, dim=0)
 
     return iwae_score, iwae_KL_score, iwae_reconst_score
 
@@ -120,8 +120,8 @@ def compute_all_scores(vae, image):
     Given an image compute all anomaly score
     return (reconst_score, vae_score, iwae_score)
     """
-    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=5)
-    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=5)
+    vae_loss, KL, reconst_err = get_vae_score(vae, image=image, L=15)
+    iwae_loss, iwae_KL, iwae_reconst = get_iwae_score(vae, image, L=15)
     result = {'reconst_score': reconst_err.item(),
               'KL_score': KL.item(),
               'vae_score': vae_loss.item(),
@@ -180,6 +180,7 @@ df = pd.DataFrame(auc_result, index=score_names, columns=classes + ['ALL'])
 print("###################### AUC ROC #####################")
 print(df)
 print("####################################################")
+df.to_csv(args.out_csv)
 
 # fit a gamma distribution
 _, val_loader = load_vae_train_datasets(args.image_size, args.data, 32)
@@ -227,6 +228,6 @@ auc_gamma_result[0, -1] = roc_auc_score(y_true, y_score)
 df = pd.DataFrame(auc_gamma_result, index=['gamma score'], columns=classes + ['ALL'])
 
 # display
-print("###################### AUC ROC #####################")
+print("###################### AUC ROC GAMMA #####################")
 print(df)
-print("###################################################")
+print("##########################################################")
