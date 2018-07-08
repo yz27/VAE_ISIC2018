@@ -8,14 +8,8 @@ export PYTHONUNBUFFERED=1
 export DATA_DIR='/home/luyuchen.paul/NV_outlier/'
 export EXP_DIR='/home/luyuchen.paul/exp_results/'
 
-declare -a outliers=("NV")
-
-# loop through outlier classes
-for outlier in "${outliers[@]}"
-do
-    echo "#################TEST ${outlier} ##################"
-    $PYTHONBIN outlier_detection.py --cuda \
-        --data ${DATA_DIR} \
-        --model_path ${EXP_DIR}/${outlier}_kl0.01/best_model.pth.tar \
-        --image_size 128 --kl_weight 0.01 --out_csv auc_result5.csv
-done
+# test
+$PYTHONBIN outlier_detection.py --cuda \
+    --data ${DATA_DIR} \
+    --model_path ${EXP_DIR}/${outlier}_kl0.01/best_model.pth.tar \
+    --image_size 128 --kl_weight 0.01 --out_csv auc_result5.csv
